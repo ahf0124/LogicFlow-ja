@@ -1,0 +1,48 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "workflows_CheckConnector2_name": {
+            "defaultValue": "CheckConnector2",
+            "type": "String"
+        }
+    },
+    "variables": {},
+    "resources": [
+        {
+            "comments": "一般化されたと思った？ 残念、クマーでした！",
+            "type": "Microsoft.Logic/workflows",
+            "name": "[parameters('workflows_CheckConnector2_name')]",
+            "apiVersion": "2016-06-01",
+            "location": "westcentralus",
+            "scale": null,
+            "properties": {
+                "state": "Enabled",
+                "definition": {
+                    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+                    "contentVersion": "1.0.0.0",
+                    "parameters": {},
+                    "triggers": {},
+                    "actions": {
+                        "For_each": {
+                            "foreach": "@createarray(1,2,3)",
+                            "actions": {
+                                "For_each2": {
+                                    "foreach": "@createarray(4,5,6)",
+                                    "actions": {},
+                                    "runAfter": {},
+                                    "type": "Foreach"
+                                }
+                            },
+                            "runAfter": {},
+                            "type": "Foreach"
+                        }
+                    },
+                    "outputs": {}
+                },
+                "parameters": {}
+            },
+            "dependsOn": []
+        }
+    ]
+}
