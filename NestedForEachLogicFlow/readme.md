@@ -7,4 +7,4 @@ Nested Foreach Connector LogicFlow.
     <img src="http://azuredeploy.net/deploybutton.png"/>
 </a>
 
-![LogicFlow](https://github.com/ahf0124/LogicFlow-ja/blob/master/NestedForEachLogicFLow/nestforeach2.png)
+![LogicFlow](https://github.com/ahf0124/LogicFlow-ja/blob/master/NestedForEachLogicFlow/nestforeach2.png)
