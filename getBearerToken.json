@@ -1,0 +1,120 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "workflows_name": {
+            "defaultValue": "LogicflowGetBearerToken",
+            "type": "String"
+        }
+    },
+    "variables": {},
+    "resources": [
+        {
+            "comments": "リソース ほげほげ から一般化されました。",
+            "type": "Microsoft.Logic/workflows",
+            "name": "[parameters('workflows_name')]",
+            "apiVersion": "2016-06-01",
+            "location": "northcentralus",
+            "properties": {
+                "state": "Enabled",
+                "definition": {
+                    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+                    "contentVersion": "1.0.0.0",
+                    "parameters": {},
+                    "triggers": {
+                        "manual": {
+                            "type": "Request",
+                            "kind": "Http",
+                            "inputs": {
+                                "method": "POST",
+                                "schema": {
+                                    "properties": {
+                                        "client_id": {
+                                            "type": "string"
+                                        },
+                                        "client_secret": {
+                                            "type": "string"
+                                        },
+                                        "resourceurl": {
+                                            "type": "string"
+                                        },
+                                        "tenanntid": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "actions": {
+                        "HTTP_Token_の取得": {
+                            "runAfter": {},
+                            "type": "Http",
+                            "inputs": {
+                                "body": "grant_type=client_credentials&resource=@{triggerBody()?['resourceurl']}&client_id=@{triggerBody()?['client_id']}&client_secret=@{triggerBody()?['client_secret']}",
+                                "headers": {
+                                    "content-type": "application/x-www-form-urlencoded"
+                                },
+                                "method": "POST",
+                                "uri": "https://login.windows.net/@{triggerBody()?['tenanntid']}/oauth2/token"
+                            }
+                        },
+                        "JSON_の解析（Token）": {
+                            "runAfter": {
+                                "HTTP_Token_の取得": [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type": "ParseJson",
+                            "inputs": {
+                                "content": "@body('HTTP_Token_の取得')",
+                                "schema": {
+                                    "properties": {
+                                        "access_token": {
+                                            "type": "string"
+                                        },
+                                        "expires_in": {
+                                            "type": "string"
+                                        },
+                                        "expires_on": {
+                                            "type": "string"
+                                        },
+                                        "ext_expires_in": {
+                                            "type": "string"
+                                        },
+                                        "not_before": {
+                                            "type": "string"
+                                        },
+                                        "resource": {
+                                            "type": "string"
+                                        },
+                                        "token_type": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        },
+                        "応答": {
+                            "runAfter": {
+                                "JSON_の解析（Token）": [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type": "Response",
+                            "inputs": {
+                                "body": "@body('JSON_の解析（Token）')?['access_token']",
+                                "statusCode": 200
+                            }
+                        }
+                    },
+                    "outputs": {}
+                },
+                "parameters": {}
+            },
+            "dependsOn": []
+        }
+    ]
+}
