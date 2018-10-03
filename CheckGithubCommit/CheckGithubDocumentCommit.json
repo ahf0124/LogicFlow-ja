@@ -1,0 +1,761 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "connections_gmail_name": {
+            "defaultValue": "gmail",
+            "type": "string"
+        },
+         "workflows_CheckConnectorDocument_name": {
+            "defaultValue": "CheckGitDocument",
+            "type": "string"
+        },
+        "github_account": {
+            "defaultValue": "account",
+            "type": "string"
+        },
+        "github_password": {
+            "defaultValue": "password",
+            "type": "string"
+        },
+        "notify_mail_address": {
+            "defaultValue": "mailaddress",
+            "type": "string"
+        }
+     },
+    "variables": {},
+    "resources": [
+        {
+            "comments": "リソースから一般化されました。",
+            "type": "Microsoft.Logic/workflows",
+            "name": "[parameters('workflows_CheckConnectorDocument_name')]",
+            "apiVersion": "2017-07-01",
+            "location": "westcentralus",
+            "tags": {},
+            "scale": null,
+            "properties": {
+                "state": "Enabled",
+                "definition": {
+                    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+                    "contentVersion": "1.0.0.0",
+                    "parameters": {
+                        "$connections": {
+                            "defaultValue": {},
+                            "type": "Object"
+                        }
+                    },
+                    "triggers": {
+                        "Githubのコミット情報を取得する": {
+                            "recurrence": {
+                                "frequency": "Hour",
+                                "interval": 3
+                            },
+                            "type": "Http",
+                            "inputs": {
+                                "authentication": {
+                                    "password": "[parameters('github_account')]",
+                                    "type": "Basic",
+                                    "username": "[parameters('github_password')]"
+                                },
+                                "method": "GET",
+                                "uri": "@concat('https://api.github.com/repos/MicrosoftDocs/azure-docs/commits?path=articles%2Fconnectors&since=', uricomponent(adddays(utcNow(),-1)))"
+                            },
+                            "conditions": [
+                                {
+                                    "expression": "@equals(empty(triggerBody()), false)"
+                                }
+                            ]
+                        }
+                    },
+                    "actions": {
+                        "For_each": {
+                            "foreach": "@body('コミット情報のJSONを解析')",
+                            "actions": {
+                                "For_each_2": {
+                                    "foreach": "@body('詳細情報のJSONを解析する')?['files']",
+                                    "actions": {
+                                        "更新ファイル名を追記する": {
+                                            "runAfter": {},
+                                            "type": "AppendToStringVariable",
+                                            "inputs": {
+                                                "name": "updateContents",
+                                                "value": "@{items('For_each_2')?['filename']}\r<br />"
+                                            }
+                                        }
+                                    },
+                                    "runAfter": {
+                                        "文字列変数に追加": [
+                                            "Succeeded"
+                                        ]
+                                    },
+                                    "type": "Foreach"
+                                },
+                                "コミット情報の詳細を取得する": {
+                                    "runAfter": {},
+                                    "type": "Http",
+                                    "inputs": {
+                                        "method": "GET",
+                                        "uri": "@items('For_each')?['url']"
+                                    }
+                                },
+                                "メールを送信します": {
+                                    "runAfter": {
+                                        "For_each_2": [
+                                            "Succeeded"
+                                        ]
+                                    },
+                                    "type": "ApiConnection",
+                                    "inputs": {
+                                        "body": {
+                                            "Body": "@variables('updateContents')",
+                                            "IsHtml": true,
+                                            "Subject": "Logic Apps コネクタ一覧ドキュメントが更新されました",
+                                            "To": "[parameters('notify_mail_address')]"
+                                        },
+                                        "host": {
+                                            "connection": {
+                                                "name": "@parameters('$connections')['gmail']['connectionId']"
+                                            }
+                                        },
+                                        "method": "post",
+                                        "path": "/Mail"
+                                    }
+                                },
+                                "文字列変数に追加": {
+                                    "runAfter": {
+                                        "詳細情報のJSONを解析する": [
+                                            "Succeeded"
+                                        ]
+                                    },
+                                    "type": "AppendToStringVariable",
+                                    "inputs": {
+                                        "name": "updateContents",
+                                        "value": "@{body('詳細情報のJSONを解析する')?['commit']?['message']}<\rbr />\n=========================================\r<\rbr />\n"
+                                    }
+                                },
+                                "更新内容の初期化": {
+                                    "runAfter": {
+                                        "メールを送信します": [
+                                            "Succeeded"
+                                        ]
+                                    },
+                                    "type": "SetVariable",
+                                    "inputs": {
+                                        "name": "updateContents",
+                                        "value": " "
+                                    }
+                                },
+                                "詳細情報のJSONを解析する": {
+                                    "runAfter": {
+                                        "コミット情報の詳細を取得する": [
+                                            "Succeeded"
+                                        ]
+                                    },
+                                    "type": "ParseJson",
+                                    "inputs": {
+                                        "content": "@body('コミット情報の詳細を取得する')",
+                                        "schema": {
+                                            "properties": {
+                                                "author": {
+                                                    "properties": {
+                                                        "avatar_url": {
+                                                            "type": "string"
+                                                        },
+                                                        "events_url": {
+                                                            "type": "string"
+                                                        },
+                                                        "followers_url": {
+                                                            "type": "string"
+                                                        },
+                                                        "following_url": {
+                                                            "type": "string"
+                                                        },
+                                                        "gists_url": {
+                                                            "type": "string"
+                                                        },
+                                                        "gravatar_id": {
+                                                            "type": "string"
+                                                        },
+                                                        "html_url": {
+                                                            "type": "string"
+                                                        },
+                                                        "id": {
+                                                            "type": "integer"
+                                                        },
+                                                        "login": {
+                                                            "type": "string"
+                                                        },
+                                                        "node_id": {
+                                                            "type": "string"
+                                                        },
+                                                        "organizations_url": {
+                                                            "type": "string"
+                                                        },
+                                                        "received_events_url": {
+                                                            "type": "string"
+                                                        },
+                                                        "repos_url": {
+                                                            "type": "string"
+                                                        },
+                                                        "site_admin": {
+                                                            "type": "boolean"
+                                                        },
+                                                        "starred_url": {
+                                                            "type": "string"
+                                                        },
+                                                        "subscriptions_url": {
+                                                            "type": "string"
+                                                        },
+                                                        "type": {
+                                                            "type": "string"
+                                                        },
+                                                        "url": {
+                                                            "type": "string"
+                                                        }
+                                                    },
+                                                    "type": "object"
+                                                },
+                                                "comments_url": {
+                                                    "type": "string"
+                                                },
+                                                "commit": {
+                                                    "properties": {
+                                                        "author": {
+                                                            "properties": {
+                                                                "date": {
+                                                                    "type": "string"
+                                                                },
+                                                                "email": {
+                                                                    "type": "string"
+                                                                },
+                                                                "name": {
+                                                                    "type": "string"
+                                                                }
+                                                            },
+                                                            "type": "object"
+                                                        },
+                                                        "comment_count": {
+                                                            "type": "integer"
+                                                        },
+                                                        "committer": {
+                                                            "properties": {
+                                                                "date": {
+                                                                    "type": "string"
+                                                                },
+                                                                "email": {
+                                                                    "type": "string"
+                                                                },
+                                                                "name": {
+                                                                    "type": "string"
+                                                                }
+                                                            },
+                                                            "type": "object"
+                                                        },
+                                                        "message": {
+                                                            "type": "string"
+                                                        },
+                                                        "tree": {
+                                                            "properties": {
+                                                                "sha": {
+                                                                    "type": "string"
+                                                                },
+                                                                "url": {
+                                                                    "type": "string"
+                                                                }
+                                                            },
+                                                            "type": "object"
+                                                        },
+                                                        "url": {
+                                                            "type": "string"
+                                                        },
+                                                        "verification": {
+                                                            "properties": {
+                                                                "payload": {
+                                                                    "type": [
+                                                                        "string",
+                                                                        "null"
+                                                                    ]
+                                                                },
+                                                                "reason": {
+                                                                    "type": [
+                                                                        "string",
+                                                                        "null"
+                                                                    ]
+                                                                },
+                                                                "signature": {
+                                                                    "type": [
+                                                                        "string",
+                                                                        "null"
+                                                                    ]
+                                                                },
+                                                                "verified": {
+                                                                    "type": [
+                                                                        "boolean",
+                                                                        "null"
+                                                                    ]
+                                                                }
+                                                            },
+                                                            "type": "object"
+                                                        }
+                                                    },
+                                                    "type": "object"
+                                                },
+                                                "committer": {
+                                                    "properties": {
+                                                        "avatar_url": {
+                                                            "type": "string"
+                                                        },
+                                                        "events_url": {
+                                                            "type": "string"
+                                                        },
+                                                        "followers_url": {
+                                                            "type": "string"
+                                                        },
+                                                        "following_url": {
+                                                            "type": "string"
+                                                        },
+                                                        "gists_url": {
+                                                            "type": "string"
+                                                        },
+                                                        "gravatar_id": {
+                                                            "type": "string"
+                                                        },
+                                                        "html_url": {
+                                                            "type": "string"
+                                                        },
+                                                        "id": {
+                                                            "type": "integer"
+                                                        },
+                                                        "login": {
+                                                            "type": "string"
+                                                        },
+                                                        "node_id": {
+                                                            "type": "string"
+                                                        },
+                                                        "organizations_url": {
+                                                            "type": "string"
+                                                        },
+                                                        "received_events_url": {
+                                                            "type": "string"
+                                                        },
+                                                        "repos_url": {
+                                                            "type": "string"
+                                                        },
+                                                        "site_admin": {
+                                                            "type": "boolean"
+                                                        },
+                                                        "starred_url": {
+                                                            "type": "string"
+                                                        },
+                                                        "subscriptions_url": {
+                                                            "type": "string"
+                                                        },
+                                                        "type": {
+                                                            "type": "string"
+                                                        },
+                                                        "url": {
+                                                            "type": "string"
+                                                        }
+                                                    },
+                                                    "type": "object"
+                                                },
+                                                "files": {
+                                                    "items": {
+                                                        "properties": {
+                                                            "additions": {
+                                                                "type": "integer"
+                                                            },
+                                                            "blob_url": {
+                                                                "type": "string"
+                                                            },
+                                                            "changes": {
+                                                                "type": "integer"
+                                                            },
+                                                            "contents_url": {
+                                                                "type": "string"
+                                                            },
+                                                            "deletions": {
+                                                                "type": "integer"
+                                                            },
+                                                            "filename": {
+                                                                "type": "string"
+                                                            },
+                                                            "patch": {
+                                                                "type": "string"
+                                                            },
+                                                            "raw_url": {
+                                                                "type": "string"
+                                                            },
+                                                            "sha": {
+                                                                "type": "string"
+                                                            },
+                                                            "status": {
+                                                                "type": "string"
+                                                            }
+                                                        },
+                                                        "type": "object"
+                                                    },
+                                                    "type": "array"
+                                                },
+                                                "html_url": {
+                                                    "type": "string"
+                                                },
+                                                "node_id": {
+                                                    "type": "string"
+                                                },
+                                                "parents": {
+                                                    "items": {
+                                                        "properties": {
+                                                            "html_url": {
+                                                                "type": "string"
+                                                            },
+                                                            "sha": {
+                                                                "type": "string"
+                                                            },
+                                                            "url": {
+                                                                "type": "string"
+                                                            }
+                                                        },
+                                                        "type": "object"
+                                                    },
+                                                    "type": "array"
+                                                },
+                                                "sha": {
+                                                    "type": "string"
+                                                },
+                                                "stats": {
+                                                    "properties": {
+                                                        "additions": {
+                                                            "type": "integer"
+                                                        },
+                                                        "deletions": {
+                                                            "type": "integer"
+                                                        },
+                                                        "total": {
+                                                            "type": "integer"
+                                                        }
+                                                    },
+                                                    "type": "object"
+                                                },
+                                                "url": {
+                                                    "type": "string"
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    }
+                                }
+                            },
+                            "runAfter": {
+                                "更新内容を保持する変数を作成": [
+                                    "Failed"
+                                ]
+                            },
+                            "type": "Foreach",
+                            "runtimeConfiguration": {
+                                "concurrency": {
+                                    "repetitions": 1
+                                }
+                            }
+                        },
+                        "コミット情報のJSONを解析": {
+                            "runAfter": {},
+                            "type": "ParseJson",
+                            "inputs": {
+                                "content": "@triggerBody()",
+                                "schema": {
+                                    "items": {
+                                        "properties": {
+                                            "author": {
+                                                "properties": {
+                                                    "avatar_url": {
+                                                        "type": "string"
+                                                    },
+                                                    "events_url": {
+                                                        "type": "string"
+                                                    },
+                                                    "followers_url": {
+                                                        "type": "string"
+                                                    },
+                                                    "following_url": {
+                                                        "type": "string"
+                                                    },
+                                                    "gists_url": {
+                                                        "type": "string"
+                                                    },
+                                                    "gravatar_id": {
+                                                        "type": "string"
+                                                    },
+                                                    "html_url": {
+                                                        "type": "string"
+                                                    },
+                                                    "id": {
+                                                        "type": "integer"
+                                                    },
+                                                    "login": {
+                                                        "type": "string"
+                                                    },
+                                                    "node_id": {
+                                                        "type": "string"
+                                                    },
+                                                    "organizations_url": {
+                                                        "type": "string"
+                                                    },
+                                                    "received_events_url": {
+                                                        "type": "string"
+                                                    },
+                                                    "repos_url": {
+                                                        "type": "string"
+                                                    },
+                                                    "site_admin": {
+                                                        "type": "boolean"
+                                                    },
+                                                    "starred_url": {
+                                                        "type": "string"
+                                                    },
+                                                    "subscriptions_url": {
+                                                        "type": "string"
+                                                    },
+                                                    "type": {
+                                                        "type": "string"
+                                                    },
+                                                    "url": {
+                                                        "type": "string"
+                                                    }
+                                                },
+                                                "type": "object"
+                                            },
+                                            "comments_url": {
+                                                "type": "string"
+                                            },
+                                            "commit": {
+                                                "properties": {
+                                                    "author": {
+                                                        "properties": {
+                                                            "date": {
+                                                                "type": "string"
+                                                            },
+                                                            "email": {
+                                                                "type": "string"
+                                                            },
+                                                            "name": {
+                                                                "type": "string"
+                                                            }
+                                                        },
+                                                        "type": "object"
+                                                    },
+                                                    "comment_count": {
+                                                        "type": "integer"
+                                                    },
+                                                    "committer": {
+                                                        "properties": {
+                                                            "date": {
+                                                                "type": "string"
+                                                            },
+                                                            "email": {
+                                                                "type": "string"
+                                                            },
+                                                            "name": {
+                                                                "type": "string"
+                                                            }
+                                                        },
+                                                        "type": "object"
+                                                    },
+                                                    "message": {
+                                                        "type": "string"
+                                                    },
+                                                    "tree": {
+                                                        "properties": {
+                                                            "sha": {
+                                                                "type": "string"
+                                                            },
+                                                            "url": {
+                                                                "type": "string"
+                                                            }
+                                                        },
+                                                        "type": "object"
+                                                    },
+                                                    "url": {
+                                                        "type": "string"
+                                                    },
+                                                    "verification": {
+                                                        "properties": {
+                                                            "payload": {
+                                                                "type": [
+                                                                    "string",
+                                                                    "null"
+                                                                ]
+                                                            },
+                                                            "reason": {
+                                                                "type": [
+                                                                    "string",
+                                                                    "null"
+                                                                ]
+                                                            },
+                                                            "signature": {
+                                                                "type": [
+                                                                    "string",
+                                                                    "null"
+                                                                ]
+                                                            },
+                                                            "verified": {
+                                                                "type": [
+                                                                    "boolean",
+                                                                    "null"
+                                                                ]
+                                                            }
+                                                        },
+                                                        "type": "object"
+                                                    }
+                                                },
+                                                "type": "object"
+                                            },
+                                            "committer": {
+                                                "properties": {
+                                                    "avatar_url": {
+                                                        "type": "string"
+                                                    },
+                                                    "events_url": {
+                                                        "type": "string"
+                                                    },
+                                                    "followers_url": {
+                                                        "type": "string"
+                                                    },
+                                                    "following_url": {
+                                                        "type": "string"
+                                                    },
+                                                    "gists_url": {
+                                                        "type": "string"
+                                                    },
+                                                    "gravatar_id": {
+                                                        "type": "string"
+                                                    },
+                                                    "html_url": {
+                                                        "type": "string"
+                                                    },
+                                                    "id": {
+                                                        "type": "integer"
+                                                    },
+                                                    "login": {
+                                                        "type": "string"
+                                                    },
+                                                    "node_id": {
+                                                        "type": "string"
+                                                    },
+                                                    "organizations_url": {
+                                                        "type": "string"
+                                                    },
+                                                    "received_events_url": {
+                                                        "type": "string"
+                                                    },
+                                                    "repos_url": {
+                                                        "type": "string"
+                                                    },
+                                                    "site_admin": {
+                                                        "type": "boolean"
+                                                    },
+                                                    "starred_url": {
+                                                        "type": "string"
+                                                    },
+                                                    "subscriptions_url": {
+                                                        "type": "string"
+                                                    },
+                                                    "type": {
+                                                        "type": "string"
+                                                    },
+                                                    "url": {
+                                                        "type": "string"
+                                                    }
+                                                },
+                                                "type": "object"
+                                            },
+                                            "html_url": {
+                                                "type": "string"
+                                            },
+                                            "node_id": {
+                                                "type": "string"
+                                            },
+                                            "parents": {
+                                                "items": {
+                                                    "properties": {
+                                                        "html_url": {
+                                                            "type": "string"
+                                                        },
+                                                        "sha": {
+                                                            "type": "string"
+                                                        },
+                                                        "url": {
+                                                            "type": "string"
+                                                        }
+                                                    },
+                                                    "type": "object"
+                                                },
+                                                "type": "array"
+                                            },
+                                            "sha": {
+                                                "type": "string"
+                                            },
+                                            "url": {
+                                                "type": "string"
+                                            }
+                                        },
+                                        "type": "object"
+                                    },
+                                    "type": "array"
+                                }
+                            }
+                        },
+                        "更新内容を保持する変数を作成": {
+                            "runAfter": {
+                                "コミット情報のJSONを解析": [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type": "InitializeVariable",
+                            "inputs": {
+                                "variables": [
+                                    {
+                                        "name": "updateContents",
+                                        "type": "String",
+                                        "value": " "
+                                    }
+                                ]
+                            }
+                        }
+                    },
+                    "outputs": {}
+                },
+                "parameters": {
+                    "$connections": {
+                        "value": {
+                            "gmail": {
+                                "connectionId": "[resourceId('Microsoft.Web/connections', parameters('connections_gmail_name'))]",
+                                "connectionName": "gmail",
+                                "id": "/subscriptions/326a3b11-d573-4c1d-aa3f-b1f75d57a91c/providers/Microsoft.Web/locations/westcentralus/managedApis/gmail"
+                            }
+                        }
+                    }
+                }
+            },
+            "dependsOn": [
+                "[resourceId('Microsoft.Web/connections', parameters('connections_gmail_name'))]"
+            ]
+        },
+        {
+            "comments": "リソースから一般化されました。",
+            "type": "Microsoft.Web/connections",
+            "name": "[parameters('connections_gmail_name')]",
+            "apiVersion": "2016-06-01",
+            "location": "westcentralus",
+            "scale": null,
+            "properties": {
+                "displayName": "[concat('notify_mailaddress@', parameters('connections_gmail_name'),'.com')]",
+                "customParameterValues": {},
+                "api": {
+                    "id": "[concat('/subscriptions/326a3b11-d573-4c1d-aa3f-b1f75d57a91c/providers/Microsoft.Web/locations/westcentralus/managedApis/', parameters('connections_gmail_name'))]"
+                }
+            },
+            "dependsOn": []
+        }
+    ]
+}
