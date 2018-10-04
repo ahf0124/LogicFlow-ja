@@ -448,7 +448,7 @@
                             },
                             "runAfter": {
                                 "更新内容を保持する変数を作成": [
-                                    "Failed"
+                                    "Succeeded"
                                 ]
                             },
                             "type": "Foreach",
