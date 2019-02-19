@@ -1,0 +1,279 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "connections_twitter_3_name": {
+            "defaultValue": "twitter",
+            "type": "String"
+        },
+        "workflows_CheckRleaseNoteSite_name": {
+            "defaultValue": "CheckRleaseNoteSite",
+            "type": "String"
+        }
+    },
+    "variables": {},
+    "resources": [
+        {
+            "comments": "リソース '/subscriptions/326a3b11-d573-4c1d-aa3f-b1f75d57a91c/resourceGroups/ResHttpGet/providers/Microsoft.Logic/workflows/CheckRleaseNoteSite' から一般化されました。",
+            "type": "Microsoft.Logic/workflows",
+            "name": "[parameters('workflows_CheckRleaseNoteSite_name')]",
+            "apiVersion": "2017-07-01",
+            "location": "westcentralus",
+            "tags": {},
+            "scale": null,
+            "properties": {
+                "state": "Disabled",
+                "definition": {
+                    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+                    "contentVersion": "1.0.0.0",
+                    "parameters": {
+                        "$connections": {
+                            "defaultValue": {},
+                            "type": "Object"
+                        }
+                    },
+                    "triggers": {
+                        "manual": {
+                            "type": "Request",
+                            "kind": "Http",
+                            "inputs": {
+                                "schema": {}
+                            }
+                        }
+                    },
+                    "actions": {
+                        "Call_myself_with_Current_Array": {
+                            "runAfter": {
+                                "Check_Previous_Result": [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type": "Http",
+                            "inputs": {
+                                "body": "@variables('currentMetas')",
+                                "method": "POST",
+                                "uri": "https://prod-12.westcentralus.logic.azure.com:443/workflows/16f67b88d5434c9ba7d060a00165d424/triggers/manual/paths/invoke?api-version=2016-10-01&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=qHdbLY6jfIdwE5Y_Vg5FHXHtgJs3vZJ86d2NnrVreY4"
+                            }
+                        },
+                        "Check_Previous_Result": {
+                            "actions": {
+                                "No_Previous_Result": {
+                                    "runAfter": {},
+                                    "type": "ApiConnection",
+                                    "inputs": {
+                                        "host": {
+                                            "connection": {
+                                                "name": "@parameters('$connections')['twitter_1']['connectionId']"
+                                            }
+                                        },
+                                        "method": "post",
+                                        "path": "/posttweet",
+                                        "queries": {
+                                            "tweetText": "Recall with current data. "
+                                        }
+                                    }
+                                }
+                            },
+                            "runAfter": {
+                                "Convert_Array_from_Current_Result": [
+                                    "Succeeded"
+                                ]
+                            },
+                            "else": {
+                                "actions": {
+                                    "Check_Same_in_Previous_and_Current_data": {
+                                        "actions": {
+                                            "Tweet_Detect_Update": {
+                                                "runAfter": {},
+                                                "type": "ApiConnection",
+                                                "inputs": {
+                                                    "host": {
+                                                        "connection": {
+                                                            "name": "@parameters('$connections')['twitter_1']['connectionId']"
+                                                        }
+                                                    },
+                                                    "method": "post",
+                                                    "path": "/posttweet",
+                                                    "queries": {
+                                                        "tweetText": "Update MicrosoftFlow Release Note ! https://docs.microsoft.com/ja-jp/business-applications-release-notes/powerplatform/released-versions/flow"
+                                                    }
+                                                }
+                                            }
+                                        },
+                                        "runAfter": {
+                                            "Convert_Array_from_Previous_Result": [
+                                                "Succeeded"
+                                            ]
+                                        },
+                                        "expression": {
+                                            "and": [
+                                                {
+                                                    "not": {
+                                                        "equals": [
+                                                            "@variables('currentMetas')",
+                                                            "@variables('previousMetas')"
+                                                        ]
+                                                    }
+                                                }
+                                            ]
+                                        },
+                                        "type": "If"
+                                    },
+                                    "Convert_Array_from_Previous_Result": {
+                                        "actions": {
+                                            "Set_Previous_Array": {
+                                                "runAfter": {},
+                                                "type": "SetVariable",
+                                                "inputs": {
+                                                    "name": "previousMetas",
+                                                    "value": "@triggerBody()"
+                                                }
+                                            }
+                                        },
+                                        "runAfter": {},
+                                        "type": "Scope"
+                                    },
+                                    "Wait_until_Next_Day": {
+                                        "runAfter": {
+                                            "Check_Same_in_Previous_and_Current_data": [
+                                                "Succeeded"
+                                            ]
+                                        },
+                                        "type": "Wait",
+                                        "inputs": {
+                                            "interval": {
+                                                "count": 1,
+                                                "unit": "Day"
+                                            }
+                                        }
+                                    }
+                                }
+                            },
+                            "expression": {
+                                "and": [
+                                    {
+                                        "equals": [
+                                            "@empty(triggerBody())",
+                                            true
+                                        ]
+                                    }
+                                ]
+                            },
+                            "type": "If"
+                        },
+                        "Convert_Array_from_Current_Result": {
+                            "actions": {
+                                "Convert_HTML_to_Array": {
+                                    "runAfter": {},
+                                    "type": "Compose",
+                                    "inputs": "@split(uriComponent(body('Get_MicrosoftFlow_Weekly_Release_Note')),'%0D%0A')"
+                                },
+                                "Detect_Meta_Tag": {
+                                    "runAfter": {
+                                        "Convert_HTML_to_Array": [
+                                            "Succeeded"
+                                        ]
+                                    },
+                                    "type": "Query",
+                                    "inputs": {
+                                        "from": "@outputs('Convert_HTML_to_Array')",
+                                        "where": "@equals(startsWith(item(), uriComponent('<meta name=\"updated_at\"')), true)"
+                                    }
+                                },
+                                "Set_Current_Array": {
+                                    "runAfter": {
+                                        "Detect_Meta_Tag": [
+                                            "Succeeded"
+                                        ]
+                                    },
+                                    "type": "SetVariable",
+                                    "inputs": {
+                                        "name": "currentMetas",
+                                        "value": "@body('Detect_Meta_Tag')"
+                                    }
+                                }
+                            },
+                            "runAfter": {
+                                "Create_Array_for_Current_Result": [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type": "Scope"
+                        },
+                        "Create_Array_for_Current_Result": {
+                            "runAfter": {
+                                "Create_Array_for_Previous_Result": [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type": "InitializeVariable",
+                            "inputs": {
+                                "variables": [
+                                    {
+                                        "name": "currentMetas",
+                                        "type": "Array"
+                                    }
+                                ]
+                            }
+                        },
+                        "Create_Array_for_Previous_Result": {
+                            "runAfter": {
+                                "Get_MicrosoftFlow_Weekly_Release_Note": [
+                                    "Succeeded"
+                                ]
+                            },
+                            "type": "InitializeVariable",
+                            "inputs": {
+                                "variables": [
+                                    {
+                                        "name": "previousMetas",
+                                        "type": "Array"
+                                    }
+                                ]
+                            }
+                        },
+                        "Get_MicrosoftFlow_Weekly_Release_Note": {
+                            "runAfter": {},
+                            "type": "Http",
+                            "inputs": {
+                                "method": "GET",
+                                "uri": "https://docs.microsoft.com/ja-jp/business-applications-release-notes/powerplatform/released-versions/flow"
+                            }
+                        }
+                    },
+                    "outputs": {}
+                },
+                "parameters": {
+                    "$connections": {
+                        "value": {
+                            "twitter_1": {
+                                "connectionId": "[resourceId('Microsoft.Web/connections', parameters('connections_twitter_3_name'))]",
+                                "connectionName": "twitter-3",
+                                "id": "/subscriptions/326a3b11-d573-4c1d-aa3f-b1f75d57a91c/providers/Microsoft.Web/locations/westcentralus/managedApis/twitter"
+                            }
+                        }
+                    }
+                }
+            },
+            "dependsOn": [
+                "[resourceId('Microsoft.Web/connections', parameters('connections_twitter_3_name'))]"
+            ]
+        },
+        {
+            "comments": "リソース '/subscriptions/326a3b11-d573-4c1d-aa3f-b1f75d57a91c/resourceGroups/ResHttpGet/providers/Microsoft.Web/connections/twitter-3' から一般化されました。",
+            "type": "Microsoft.Web/connections",
+            "name": "[parameters('connections_twitter_3_name')]",
+            "apiVersion": "2016-06-01",
+            "location": "westcentralus",
+            "scale": null,
+            "properties": {
+                "displayName": "botkumaa",
+                "customParameterValues": {},
+                "api": {
+                    "id": "/subscriptions/326a3b11-d573-4c1d-aa3f-b1f75d57a91c/providers/Microsoft.Web/locations/westcentralus/managedApis/twitter"
+                }
+            },
+            "dependsOn": []
+        }
+    ]
+}
